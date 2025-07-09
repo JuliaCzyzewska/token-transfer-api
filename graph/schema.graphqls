@@ -1,0 +1,12 @@
+type Wallet {
+  address: ID!
+  balance: Int!
+}
+
+type Query {
+  wallet(address: ID!): Wallet
+}
+
+type Mutation {
+  transfer(from_address: ID!, to_address: ID!, amount: Int!): Int!
+}
