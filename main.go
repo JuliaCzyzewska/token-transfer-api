@@ -4,8 +4,15 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"token_transfer/graph"
 
+	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
+	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
@@ -42,5 +49,29 @@ func main() {
 	}
 
 	fmt.Println("Connected to DB.")
+
+	// Start Graph server
+	resolver := &graph.Resolver{DB: db}
+	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: resolver}))
+
+	srv.AddTransport(transport.Options{})
+	srv.AddTransport(transport.GET{})
+	srv.AddTransport(transport.POST{})
+	srv.AddTransport(transport.Websocket{
+		Upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				// TODO: add check origin
+				return true
+			},
+		},
+	})
+
+	srv.Use(extension.Introspection{})
+
+	http.Handle("/", playground.Handler("GraphQL", "/query"))
+	http.Handle("/query", srv)
+
+	log.Println("GraphQL server running at http://localhost:8080/")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 
 }

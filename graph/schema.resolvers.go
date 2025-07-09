@@ -12,12 +12,54 @@ import (
 
 // Transfer is the resolver for the transfer field.
 func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toAddress string, amount int32) (int32, error) {
-	panic(fmt.Errorf("not implemented: Transfer - transfer"))
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	// Chech token_balance
+	var fromBalance int32
+	err = tx.QueryRow("SELECT token_balance FROM wallets WHERE address = $1 FOR UPDATE", fromAddress).Scan(&fromBalance)
+	if err != nil {
+		return 0, err
+	}
+
+	if fromBalance < amount {
+		return 0, fmt.Errorf("insufficient balance")
+	}
+
+	// Substract tokens from sender wallet
+	_, err = tx.Exec("UPDATE wallets SET token_balance = token_balance - $1 WHERE address = $2", amount, fromAddress)
+	if err != nil {
+		return 0, err
+	}
+
+	// Add tokens to destination wallet
+	_, err = tx.Exec("UPDATE wallets SET token_balance = token_balance + $1 WHERE address = $2", amount, toAddress)
+	if err != nil {
+		return 0, err
+	}
+
+	// Commit
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+
+	return fromBalance - amount, nil
 }
 
 // Wallet is the resolver for the wallet field.
 func (r *queryResolver) Wallet(ctx context.Context, address string) (*model.Wallet, error) {
-	panic(fmt.Errorf("not implemented: Wallet - wallet"))
+	row := r.DB.QueryRow("SELECT address, token_balance FROM wallets WHERE address = $1", address)
+
+	var wallet model.Wallet
+	err := row.Scan(&wallet.Address, &wallet.Balance)
+	if err != nil {
+		return nil, err
+	}
+
+	return &wallet, nil
 }
 
 // Mutation returns MutationResolver implementation.
