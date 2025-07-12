@@ -246,7 +246,77 @@ func TestTransferInsufficientBalanceError(t *testing.T) {
 	if !strings.Contains(err.Error(), "insufficient balance") {
 		t.Fatalf("Expected 'insufficient balance' error, got: %v", err)
 	}
+}
 
+func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
+	db := setupDB(t)
+
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	initWallet(t, db, "A", 10)
+	initWallet(t, db, "D", 10)
+
+	// wait for 3 wg.Done() before continuing
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	// Synchronization barrier
+	// wait until all goroutines are ready
+	start := make(chan struct{})
+
+	// Transfer: A -> B (amount 4)
+	// can fail due to insufficent balance
+	go func() {
+		defer wg.Done()
+		<-start // barrier up
+		_, err := mr.Transfer(ctx, "A", "B", 4)
+		if err != nil && !strings.Contains(err.Error(), "insufficient balance") {
+			t.Errorf("A -> B failed unexpectedly: %v", err)
+		}
+	}()
+
+	// Transfer: A -> C (amount 7)
+	// can fail due to insufficent balance
+	go func() {
+		defer wg.Done()
+		<-start // barrier up
+		_, err := mr.Transfer(ctx, "A", "C", 7)
+		if err != nil && !strings.Contains(err.Error(), "insufficient balance") {
+			t.Errorf("A -> C failed unexpectedly: %v", err)
+		}
+	}()
+
+	// Transfer: D -> A (amount 1)
+	go func() {
+		defer wg.Done()
+		<-start // barrier up
+		_, err := mr.Transfer(ctx, "D", "A", 1)
+		if err != nil {
+			t.Errorf("D -> A failed unexpectedly: %v", err)
+		}
+	}()
+
+	close(start) // bariers down
+
+	// Wait for all to finish
+	wg.Wait()
+
+	// Check final balances
+	a := getBalance(t, db, "A")
+	b := getBalance(t, db, "B")
+	c := getBalance(t, db, "C")
+
+	t.Logf("Final balances: A = %d, B = %d, C = %d", a, b, c)
+
+	// Expected:
+	// Final A wallet balance should be integer between [0, 11]
+	if a < 0 || a > 11 {
+		t.Errorf("Balance A should never go below 0 or above 11, got %d", a)
+	}
 }
 
 func TestManyConcurrentTransfersDeadlock(t *testing.T) {
@@ -267,7 +337,7 @@ func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 	wg.Add(transferCount)
 
 	// Synchronization barrier
-	// will wait until both goroutines are ready
+	// wait until both goroutines are ready
 	start := make(chan struct{})
 
 	// Launch 50 transfers
@@ -295,7 +365,7 @@ func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 	}
 
 	// Let all goroutines proceed at the same time
-	close(start) // barier down
+	close(start) // bariers down
 
 	// Wait for all to finish
 	wg.Wait()
@@ -308,5 +378,4 @@ func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 	expectedB := 875
 
 	assertBalances(t, db, expectedA, expectedB, "A", "B")
-
 }
