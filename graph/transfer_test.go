@@ -44,11 +44,6 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Failed to ping DB: %v", err)
 	}
 
-	// Reset table in DB
-	if err := recreateTable(testDB); err != nil {
-		log.Fatalf("Failed to recreate table: %v", err)
-	}
-
 	// Run the tests
 	code := m.Run()
 
@@ -59,36 +54,6 @@ func TestMain(m *testing.M) {
 
 	os.Exit(code)
 
-}
-
-func recreateTable(db *sql.DB) error {
-	// Drop table if exists
-	_, err := db.Exec(`DROP TABLE IF EXISTS wallets`)
-	if err != nil {
-		return fmt.Errorf("error dropping table: %w", err)
-	}
-
-	// Create table
-	_, err = db.Exec(`
-		CREATE TABLE wallets (
-			address TEXT PRIMARY KEY,
-			token_balance INTEGER NOT NULL CHECK (token_balance >= 0)
-		)
-	`)
-	if err != nil {
-		return fmt.Errorf("error creating table: %w", err)
-	}
-
-	// Insert initial wallet
-	_, err = db.Exec(`
-		INSERT INTO wallets (address, token_balance)
-		VALUES ('0x0000000000000000000000000000000000000000', 1000000)
-	`)
-	if err != nil {
-		return fmt.Errorf("error inserting initial wallet: %w", err)
-	}
-
-	return nil
 }
 
 // Returns already created DB instance
