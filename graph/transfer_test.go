@@ -121,15 +121,61 @@ func getBalance(t *testing.T, db *sql.DB, address string) int {
 	return balance
 }
 
-func TestConnection(t *testing.T) {
+func assertBalances(t *testing.T, db *sql.DB, expectedA, expectedB int, addrA, addrB string) {
+	t.Helper()
+
+	a := getBalance(t, db, addrA)
+	b := getBalance(t, db, addrB)
+
+	t.Logf("Final balances: %s = %d, %s = %d", addrA, a, addrB, b)
+
+	if a != expectedA || b != expectedB {
+		t.Errorf("Unexpected balances: got %s = %d, %s = %d; want %s = %d, %s = %d",
+			addrA, a, addrB, b, addrA, expectedA, addrB, expectedB)
+	}
+}
+
+// Tests
+func TestTransferBetweenExistingWallets(t *testing.T) {
 	db := setupDB(t)
 
-	err := db.Ping()
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	initWallet(t, db, "A", 1000)
+	initWallet(t, db, "B", 1000)
+
+	// A -> B Transfer
+	fromAddress := "A"
+	toAddress := "B"
+	amount := 100
+	_, err := mr.Transfer(ctx, fromAddress, toAddress, int32(amount))
 	if err != nil {
-		t.Fatalf("DB ping failed in test: %v", err)
+		t.Errorf("Transfer %s → %s failed: %v", fromAddress, toAddress, err)
 	}
 
-	t.Log("DB connection successful")
+	// Check balances
+	expectedA := 900
+	expectedB := 1100
+	assertBalances(t, db, expectedA, expectedB, "A", "B")
+
+	// B -> A Transfer
+	fromAddress = "B"
+	toAddress = "A"
+	amount = 100
+
+	_, err = mr.Transfer(ctx, fromAddress, toAddress, int32(amount))
+	if err != nil {
+		t.Errorf("Transfer %s → %s failed: %v", fromAddress, toAddress, err)
+	}
+
+	// Check balances
+	expectedA = 1000
+	expectedB = 1000
+	assertBalances(t, db, expectedA, expectedB, "A", "B")
 
 }
 
@@ -188,18 +234,12 @@ func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 	wg.Wait()
 
 	// Check final balances
-	a := getBalance(t, db, "A")
-	b := getBalance(t, db, "B")
-
 	// Expected:
 	// A lost 25 × 5 = 125, gained 25 × 10 = 250; A = 1000 +125
 	// B lost 25 × 10 = 250, gained 25 × 5 = 125; B = 1000 -125
 	expectedA := 1125
 	expectedB := 875
 
-	t.Logf("Final balances: A = %d, B = %d", a, b)
+	assertBalances(t, db, expectedA, expectedB, "A", "B")
 
-	if a != expectedA || b != expectedB {
-		t.Errorf("Unexpected balances: got A = %d, B = %d; want A = %d, B = %d", a, b, expectedA, expectedB)
-	}
 }
