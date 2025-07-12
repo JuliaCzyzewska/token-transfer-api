@@ -1,6 +1,6 @@
 type Wallet {
   address: ID!
-  balance: Int!
+  balance: String!
 }
 
 type Query {
@@ -8,5 +8,5 @@ type Query {
 }
 
 type Mutation {
-  transfer(from_address: ID!, to_address: ID!, amount: Int!): Int!
+  transfer(from_address: ID!, to_address: ID!, amount: String!): String!
 }
