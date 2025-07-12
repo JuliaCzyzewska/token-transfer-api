@@ -179,6 +179,34 @@ func TestTransferBetweenExistingWallets(t *testing.T) {
 
 }
 
+func TestAddingNewWallet(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean data
+	clearWallets(t, db)
+	// Insert initial wallet
+	fromAddress := "0x0000000000000000000000000000000000000000"
+	initWallet(t, db, fromAddress, 1000000)
+
+	// Add new wallet through transfer of tokens from initial wallet
+	newWalletAddress := "A"
+	amount := 100
+	_, err := mr.Transfer(ctx, fromAddress, newWalletAddress, int32(amount))
+	if err != nil {
+		t.Errorf("Transfer %s → %s failed: %v", fromAddress, newWalletAddress, err)
+	}
+
+	// Check if new wallet exists
+	newWalletBalance := getBalance(t, db, newWalletAddress)
+	if newWalletBalance != amount {
+		t.Errorf("Unexpected balance: got %d, want %d", newWalletBalance, amount)
+	}
+
+}
+
 func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 	db := setupDB(t)
 
