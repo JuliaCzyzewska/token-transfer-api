@@ -133,7 +133,7 @@ func TestConnection(t *testing.T) {
 
 }
 
-func TestConcurrentTransfersDeadlock(t *testing.T) {
+func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 	db := setupDB(t)
 
 	ctx := context.Background()
@@ -142,53 +142,64 @@ func TestConcurrentTransfersDeadlock(t *testing.T) {
 
 	// Clean and seed test data
 	clearWallets(t, db)
-	initWallet(t, db, "A", 100)
-	initWallet(t, db, "B", 100)
+	initWallet(t, db, "A", 1000)
+	initWallet(t, db, "B", 1000)
 
-	// wait for 2 wg.Done() before continuing
+	// wait for 50 wg.Done() before continuing
+	const transferCount = 50
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(transferCount)
 
 	// Synchronization barrier
 	// will wait until both goroutines are ready
 	start := make(chan struct{})
 
-	// Transfer A -> B
-	go func() {
-		defer wg.Done()
-		<-start // barrier up
-		_, err := mr.Transfer(ctx, "A", "B", 10)
-		if err != nil {
-			t.Errorf("Transfer A->B failed: %v", err)
+	// Launch 50 transfers
+	// 25 transfers A -> B (amount 5)
+	// 25 transfers B -> A (amount 10)
+	for i := 0; i < transferCount; i++ {
+		// A -> B
+		from := "A"
+		to := "B"
+		amount := 5
+
+		//  B -> A
+		if i%2 == 1 {
+			from, to = "B", "A"
+			amount = 10
 		}
-	}()
 
-	// Transfer B -> A
-	go func() {
-		defer wg.Done()
-		<-start // barrier up
-		_, err := mr.Transfer(ctx, "B", "A", 20)
-		if err != nil {
-			t.Errorf("Transfer B->A failed: %v", err)
-		}
-	}()
+		// Transfer
+		go func(from, to string, amount int) {
+			defer wg.Done()
+			<-start // barrier up
 
-	// Let both goroutines proceed at the same time
-	close(start)
+			_, err := mr.Transfer(ctx, from, to, int32(amount))
+			if err != nil {
+				t.Errorf("Transfer %s → %s failed: %v", from, to, err)
+			}
+		}(from, to, amount)
+	}
 
-	// Wait for both to finish
+	// Let all goroutines proceed at the same time
+	close(start) // barier down
+
+	// Wait for all to finish
 	wg.Wait()
 
 	// Check final balances
 	a := getBalance(t, db, "A")
 	b := getBalance(t, db, "B")
 
+	// Expected:
+	// A lost 25 × 5 = 125, gained 25 × 10 = 250; A = 1000 +125
+	// B lost 25 × 10 = 250, gained 25 × 5 = 125; B = 1000 -125
+	expectedA := 1125
+	expectedB := 875
+
 	t.Logf("Final balances: A = %d, B = %d", a, b)
 
-	// Expected:
-	// A lost 10, gained 20 = +10 => 110
-	// B gained 10, lost 20 = -10 =>  90
-	if a != 110 || b != 90 {
-		t.Errorf("Unexpected final balances: A = %d, B = %d", a, b)
+	if a != expectedA || b != expectedB {
+		t.Errorf("Unexpected balances: got A = %d, B = %d; want A = %d, B = %d", a, b, expectedA, expectedB)
 	}
 }
