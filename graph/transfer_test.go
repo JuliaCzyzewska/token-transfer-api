@@ -136,6 +136,15 @@ func assertBalances(t *testing.T, db *sql.DB, expectedA, expectedB int, addrA, a
 	}
 }
 
+func doTransfer(t *testing.T, mr *mutationResolver, ctx context.Context, fromAddress, toAddress string, amount int32) {
+	t.Helper()
+
+	_, err := mr.Transfer(ctx, fromAddress, toAddress, amount)
+	if err != nil {
+		t.Errorf("Transfer %s → %s failed: %v", fromAddress, toAddress, err)
+	}
+}
+
 // Tests
 func TestTransferBetweenExistingWallets(t *testing.T) {
 	db := setupDB(t)
@@ -153,10 +162,7 @@ func TestTransferBetweenExistingWallets(t *testing.T) {
 	fromAddress := "A"
 	toAddress := "B"
 	amount := 100
-	_, err := mr.Transfer(ctx, fromAddress, toAddress, int32(amount))
-	if err != nil {
-		t.Errorf("Transfer %s → %s failed: %v", fromAddress, toAddress, err)
-	}
+	doTransfer(t, mr, ctx, fromAddress, toAddress, int32(amount))
 
 	// Check balances
 	expectedA := 900
@@ -167,11 +173,7 @@ func TestTransferBetweenExistingWallets(t *testing.T) {
 	fromAddress = "B"
 	toAddress = "A"
 	amount = 100
-
-	_, err = mr.Transfer(ctx, fromAddress, toAddress, int32(amount))
-	if err != nil {
-		t.Errorf("Transfer %s → %s failed: %v", fromAddress, toAddress, err)
-	}
+	doTransfer(t, mr, ctx, fromAddress, toAddress, int32(amount))
 
 	// Check balances
 	expectedA = 1000
@@ -195,10 +197,7 @@ func TestAddingNewWallet(t *testing.T) {
 	// Add new wallet through transfer of tokens from initial wallet
 	newWalletAddress := "A"
 	amount := 100
-	_, err := mr.Transfer(ctx, fromAddress, newWalletAddress, int32(amount))
-	if err != nil {
-		t.Errorf("Transfer %s → %s failed: %v", fromAddress, newWalletAddress, err)
-	}
+	doTransfer(t, mr, ctx, fromAddress, newWalletAddress, int32(amount))
 
 	// Check if new wallet exists
 	newWalletBalance := getBalance(t, db, newWalletAddress)
@@ -245,12 +244,10 @@ func TestTransferReducesBalanceToZero(t *testing.T) {
 	amount := 1000
 	initWallet(t, db, "A", amount)
 
+	// Transfer
 	fromAddress := "A"
 	toAddress := "B"
-	_, err := mr.Transfer(ctx, fromAddress, toAddress, int32(amount))
-	if err != nil {
-		t.Errorf("Transfer %s → %s failed: %v", fromAddress, toAddress, err)
-	}
+	doTransfer(t, mr, ctx, fromAddress, toAddress, int32(amount))
 
 	// Check balances
 	expectedA := 0
@@ -285,13 +282,13 @@ func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 	// 25 transfers B -> A (amount 10)
 	for i := 0; i < transferCount; i++ {
 		// A -> B
-		from := "A"
-		to := "B"
+		fromAddress := "A"
+		toAddress := "B"
 		amount := 5
 
 		//  B -> A
 		if i%2 == 1 {
-			from, to = "B", "A"
+			fromAddress, toAddress = "B", "A"
 			amount = 10
 		}
 
@@ -300,11 +297,8 @@ func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 			defer wg.Done()
 			<-start // barrier up
 
-			_, err := mr.Transfer(ctx, from, to, int32(amount))
-			if err != nil {
-				t.Errorf("Transfer %s → %s failed: %v", from, to, err)
-			}
-		}(from, to, amount)
+			doTransfer(t, mr, ctx, fromAddress, toAddress, int32(amount))
+		}(fromAddress, toAddress, amount)
 	}
 
 	// Let all goroutines proceed at the same time
