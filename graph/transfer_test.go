@@ -231,6 +231,31 @@ func TestTransferNoRowsError(t *testing.T) {
 	if !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("Expected 'no rows' error, got: %v", err)
 	}
+}
+
+func TestTransferReducesBalanceToZero(t *testing.T) {
+	db := setupDB(t)
+
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	amount := 1000
+	initWallet(t, db, "A", amount)
+
+	fromAddress := "A"
+	toAddress := "B"
+	_, err := mr.Transfer(ctx, fromAddress, toAddress, int32(amount))
+	if err != nil {
+		t.Errorf("Transfer %s → %s failed: %v", fromAddress, toAddress, err)
+	}
+
+	// Check balances
+	expectedA := 0
+	expectedB := 1000
+	assertBalances(t, db, expectedA, expectedB, "A", "B")
 
 }
 
