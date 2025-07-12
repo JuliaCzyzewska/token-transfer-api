@@ -324,6 +324,109 @@ func TestTransferAfterInsufficientBalance(t *testing.T) {
 
 }
 
+func TestValidateTokenAmount_InvalidDecimal(t *testing.T) {
+	db := setupDB(t)
+
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	initWallet(t, db, "A", "10")
+
+	// Transfer
+	invalidAmount := "abc123"
+	_, err := mr.Transfer(ctx, "A", "B", invalidAmount)
+
+	// Check if transfer throws error
+	if err == nil {
+		t.Fatal("Transfer with invalid amount did not throw error")
+	}
+	// Check error type
+	if !strings.Contains(err.Error(), "invalid decimal amount") {
+		t.Fatalf("Expected 'invalid decimal amount' error, got: %v", err)
+	}
+}
+
+func TestValidateAmount_TooManyDecimalPlaces(t *testing.T) {
+	db := setupDB(t)
+
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	initWallet(t, db, "A", "10")
+
+	// Transfer
+	invalidAmount := "1.1234567890123456789" // >18 decimal places
+	_, err := mr.Transfer(ctx, "A", "B", invalidAmount)
+
+	// Check if transfer throws error
+	if err == nil {
+		t.Fatal("Transfer with invalid amount did not throw error")
+	}
+	// Check error type
+	if !strings.Contains(err.Error(), "too many decimal places") {
+		t.Fatalf("Expected 'too many decimal places' error, got: %v", err)
+	}
+
+}
+
+func TestValidateAmount_TooManyDigits(t *testing.T) {
+	db := setupDB(t)
+
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	initWallet(t, db, "A", "10")
+
+	// Transfer
+	invalidAmount := "12345678901234567890123456789.0" // >28 digits
+	_, err := mr.Transfer(ctx, "A", "B", invalidAmount)
+
+	// Check if transfer throws error
+	if err == nil {
+		t.Fatal("Transfer with invalid amount did not throw error")
+	}
+	// Check error type
+	if !strings.Contains(err.Error(), "too many digits") {
+		t.Fatalf("Expected 'too many digits' error, got: %v", err)
+	}
+
+}
+
+func TestValidateAmount_AmountBelowZero(t *testing.T) {
+	db := setupDB(t)
+
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	initWallet(t, db, "A", "10")
+
+	// Transfer
+	invalidAmount := "-12"
+	_, err := mr.Transfer(ctx, "A", "B", invalidAmount)
+
+	// Check if transfer throws error
+	if err == nil {
+		t.Fatal("Transfer with invalid amount did not throw error")
+	}
+	// Check error type
+	if !strings.Contains(err.Error(), "amount must be greater than zero") {
+		t.Fatalf("Expected 'amount must be greater than zero' error, got: %v", err)
+	}
+
+}
+
 func TestCyclicTransfer(t *testing.T) {
 	db := setupDB(t)
 

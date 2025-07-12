@@ -8,6 +8,8 @@ import (
 	"hash/fnv"
 	"math/big"
 	"token_transfer/graph/model"
+
+	"github.com/shopspring/decimal"
 )
 
 // Helpers
@@ -65,6 +67,30 @@ func (r *mutationResolver) updateBalances(tx *sql.Tx, fromAddress, toAddress str
 	return err
 }
 
+// Validate if token count checks the contraints of DB => NUMERIC(28, 18)
+func validateTokenAmount(amount string) error {
+	amountDecimal, err := decimal.NewFromString(amount)
+	if err != nil {
+		return fmt.Errorf("invalid decimal amount")
+	}
+
+	if amountDecimal.Cmp(decimal.Zero) <= 0 {
+		return fmt.Errorf("amount must be greater than zero")
+	}
+
+	if amountDecimal.Exponent() < -18 {
+		return fmt.Errorf("too many decimal places: max 18 allowed")
+	}
+
+	// Check if amount does not have more than 28 digits
+	coeff := amountDecimal.Coefficient()
+	totalDigits := len(coeff.String())
+	if totalDigits > 28 {
+		return fmt.Errorf("too many digits: max precision is 28")
+	}
+	return nil
+}
+
 // Resolver for the transfer field
 func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toAddress string, amount string) (string, error) {
 	tx, err := r.DB.Begin()
@@ -72,6 +98,11 @@ func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toA
 		return "", err
 	}
 	defer tx.Rollback()
+
+	// Validate amount
+	if err := validateTokenAmount(amount); err != nil {
+		return "", err
+	}
 
 	// Add advisory lock for server and recipient
 	// If other transactions try to add lock, they will have to wait
