@@ -3,6 +3,7 @@ package graph
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -203,6 +204,32 @@ func TestAddingNewWallet(t *testing.T) {
 	newWalletBalance := getBalance(t, db, newWalletAddress)
 	if newWalletBalance != amount {
 		t.Errorf("Unexpected balance: got %d, want %d", newWalletBalance, amount)
+	}
+}
+
+func TestTransferNoRowsError(t *testing.T) {
+	db := setupDB(t)
+
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	initWallet(t, db, "A", 1000)
+
+	// Try transfering tokens from nonexistent sender
+	fromAddress := "C"
+	toAddress := "A"
+	amount := 100
+	_, err := mr.Transfer(ctx, fromAddress, toAddress, int32(amount))
+	if err == nil {
+		t.Fatal("Transfer from nonexistent sender did not throw error")
+	}
+
+	// Check if error is NoRows error
+	if !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("Expected 'no rows' error, got: %v", err)
 	}
 
 }
