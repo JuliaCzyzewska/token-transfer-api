@@ -9,8 +9,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"token_transfer/graph/model"
 )
+
+// Convert address to int64 using hash
+func hashAddress(address string) int64 {
+	h := fnv.New64()
+	h.Write([]byte(address))
+	return int64(h.Sum64())
+}
 
 // Resolver for the transfer field
 func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toAddress string, amount int32) (int32, error) {
@@ -20,8 +28,17 @@ func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toA
 	}
 	defer tx.Rollback()
 
+	// Add advisory lock for server and recipient
+	// If other transactions try to add lock, they will have to wait
+	// until the end of transaction
+	if err := r.addLockOnAddress(tx, fromAddress); err != nil {
+		return 0, err
+	}
+	if err := r.addLockOnAddress(tx, toAddress); err != nil {
+		return 0, err
+	}
+
 	// Check token_balance of the sender
-	// lock the sender row
 	senderBalance, err := r.getTokenBalance(tx, fromAddress)
 	if err != nil {
 		return 0, err
@@ -30,11 +47,10 @@ func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toA
 		return 0, fmt.Errorf("insufficient balance")
 	}
 
-	// Lock recipient
+	// Check if recipient wallet exists
 	_, err = r.getTokenBalance(tx, toAddress)
 	if err != nil {
-		// Recipient wallet does not exist - add it to DB
-		// Wallet is not visible to others before the commit
+		// If wallet does not exist - add it to DB
 		if errors.Is(err, sql.ErrNoRows) {
 			if err := r.addWallet(tx, toAddress); err != nil {
 				return 0, err
@@ -64,10 +80,9 @@ func (r *mutationResolver) addWallet(tx *sql.Tx, address string) error {
 }
 
 // Return token_balance
-// Lock wallet row for transaction (until commit)
 func (r *mutationResolver) getTokenBalance(tx *sql.Tx, address string) (int32, error) {
 	var balance int32
-	err := tx.QueryRow("SELECT token_balance FROM wallets WHERE address = $1 FOR UPDATE", address).Scan(&balance)
+	err := tx.QueryRow("SELECT token_balance FROM wallets WHERE address = $1", address).Scan(&balance)
 	return balance, err
 }
 
@@ -91,6 +106,12 @@ func (r *queryResolver) Wallet(ctx context.Context, address string) (*model.Wall
 	}
 
 	return &wallet, nil
+}
+
+func (r *mutationResolver) addLockOnAddress(tx *sql.Tx, address string) error {
+	hashKey := hashAddress(address)
+	_, err := tx.Exec("SELECT pg_advisory_xact_lock($1)", hashKey)
+	return err
 }
 
 // Return MutationResolver implementation
