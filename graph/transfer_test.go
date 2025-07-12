@@ -248,6 +248,43 @@ func TestTransferInsufficientBalanceError(t *testing.T) {
 	}
 }
 
+func TestTransferAfterInsufficientBalance(t *testing.T) {
+	db := setupDB(t)
+
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	initWallet(t, db, "A", 10)
+
+	// Transfer amount bigger than sender's balance
+	fromAddress := "A"
+	toAddress := "B"
+	amount := 11
+
+	_, err := mr.Transfer(ctx, fromAddress, toAddress, int32(amount))
+	// Check if transfer throws error
+	if err == nil {
+		t.Fatal("Transfer with insufficient balance did not throw error")
+	}
+	// Check error type
+	if !strings.Contains(err.Error(), "insufficient balance") {
+		t.Fatalf("Expected 'insufficient balance' error, got: %v", err)
+	}
+
+	// Transfer amount sender can send
+	amount = 10
+	doTransfer(t, mr, ctx, fromAddress, toAddress, int32(amount))
+
+	// Check balances
+	expectedA := 0
+	expectedB := 10
+	assertBalances(t, db, expectedA, expectedB, "A", "B")
+
+}
+
 func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	db := setupDB(t)
 
