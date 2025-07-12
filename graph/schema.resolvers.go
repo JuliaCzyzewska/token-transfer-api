@@ -7,6 +7,7 @@ package graph
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"token_transfer/graph/model"
 )
@@ -19,13 +20,28 @@ func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toA
 	}
 	defer tx.Rollback()
 
-	// Chech token_balance of the sender
-	senderBalance, err := r.getSenderBalance(tx, fromAddress)
+	// Check token_balance of the sender
+	// lock the sender row
+	senderBalance, err := r.getTokenBalance(tx, fromAddress)
 	if err != nil {
 		return 0, err
 	}
 	if senderBalance < amount {
 		return 0, fmt.Errorf("insufficient balance")
+	}
+
+	// Lock recipient
+	_, err = r.getTokenBalance(tx, toAddress)
+	if err != nil {
+		// Recipient wallet does not exist - add it to DB
+		// Wallet is not visible to others before the commit
+		if errors.Is(err, sql.ErrNoRows) {
+			if err := r.addWallet(tx, toAddress); err != nil {
+				return 0, err
+			}
+		} else {
+			return 0, err
+		}
 	}
 
 	// Update token balances
@@ -41,8 +57,15 @@ func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toA
 	return senderBalance - amount, nil
 }
 
-// Locks chosen row for transaction (until commit)
-func (r *mutationResolver) getSenderBalance(tx *sql.Tx, address string) (int32, error) {
+// Add wallet with 0 tokens
+func (r *mutationResolver) addWallet(tx *sql.Tx, address string) error {
+	_, err := tx.Exec("INSERT INTO wallets (address, token_balance) VALUES ($1, 0)", address)
+	return err
+}
+
+// Return token_balance
+// Lock wallet row for transaction (until commit)
+func (r *mutationResolver) getTokenBalance(tx *sql.Tx, address string) (int32, error) {
 	var balance int32
 	err := tx.QueryRow("SELECT token_balance FROM wallets WHERE address = $1 FOR UPDATE", address).Scan(&balance)
 	return balance, err
@@ -70,10 +93,10 @@ func (r *queryResolver) Wallet(ctx context.Context, address string) (*model.Wall
 	return &wallet, nil
 }
 
-// Returns MutationResolver implementation
+// Return MutationResolver implementation
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
-// Returns QueryResolver implementation
+// Return QueryResolver implementation
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
