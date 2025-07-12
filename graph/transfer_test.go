@@ -186,6 +186,28 @@ func TestAddingNewWallet(t *testing.T) {
 
 }
 
+func TestFractionalTokenTransfer(t *testing.T) {
+	db := setupDB(t)
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean data
+	clearWallets(t, db)
+	// Insert initial wallet
+	fromAddress := "0x0000000000000000000000000000000000000000"
+	initWallet(t, db, fromAddress, "1000000")
+
+	toAddress := "A"
+	amount := "0.000000000000000001" // 1 * 10^-18
+	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
+
+	// Check balances
+	expectedSenderBalance := "999999.999999999999999999"
+	assertBalance(t, db, amount, toAddress)
+	assertBalance(t, db, expectedSenderBalance, fromAddress)
+}
+
 func TestTransferNoRowsError(t *testing.T) {
 	db := setupDB(t)
 
