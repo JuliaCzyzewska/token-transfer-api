@@ -6,11 +6,12 @@ package graph
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"token_transfer/graph/model"
 )
 
-// Transfer is the resolver for the transfer field.
+// Resolver for the transfer field
 func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toAddress string, amount int32) (int32, error) {
 	tx, err := r.DB.Begin()
 	if err != nil {
@@ -18,26 +19,17 @@ func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toA
 	}
 	defer tx.Rollback()
 
-	// Chech token_balance
-	var fromBalance int32
-	err = tx.QueryRow("SELECT token_balance FROM wallets WHERE address = $1 FOR UPDATE", fromAddress).Scan(&fromBalance)
+	// Chech token_balance of the sender
+	senderBalance, err := r.getSenderBalance(tx, fromAddress)
 	if err != nil {
 		return 0, err
 	}
-
-	if fromBalance < amount {
+	if senderBalance < amount {
 		return 0, fmt.Errorf("insufficient balance")
 	}
 
-	// Substract tokens from sender wallet
-	_, err = tx.Exec("UPDATE wallets SET token_balance = token_balance - $1 WHERE address = $2", amount, fromAddress)
-	if err != nil {
-		return 0, err
-	}
-
-	// Add tokens to destination wallet
-	_, err = tx.Exec("UPDATE wallets SET token_balance = token_balance + $1 WHERE address = $2", amount, toAddress)
-	if err != nil {
+	// Update token balances
+	if err := r.updateBalances(tx, fromAddress, toAddress, amount); err != nil {
 		return 0, err
 	}
 
@@ -46,10 +38,26 @@ func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toA
 		return 0, err
 	}
 
-	return fromBalance - amount, nil
+	return senderBalance - amount, nil
 }
 
-// Wallet is the resolver for the wallet field.
+// Locks chosen row for transaction (until commit)
+func (r *mutationResolver) getSenderBalance(tx *sql.Tx, address string) (int32, error) {
+	var balance int32
+	err := tx.QueryRow("SELECT token_balance FROM wallets WHERE address = $1 FOR UPDATE", address).Scan(&balance)
+	return balance, err
+}
+
+func (r *mutationResolver) updateBalances(tx *sql.Tx, fromAddress, toAddress string, amount int32) error {
+	_, err := tx.Exec("UPDATE wallets SET token_balance = token_balance - $1 WHERE address = $2", amount, fromAddress)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec("UPDATE wallets SET token_balance = token_balance + $1 WHERE address = $2", amount, toAddress)
+	return err
+}
+
+// Resolver for the wallet field
 func (r *queryResolver) Wallet(ctx context.Context, address string) (*model.Wallet, error) {
 	row := r.DB.QueryRow("SELECT address, token_balance FROM wallets WHERE address = $1", address)
 
@@ -62,10 +70,10 @@ func (r *queryResolver) Wallet(ctx context.Context, address string) (*model.Wall
 	return &wallet, nil
 }
 
-// Mutation returns MutationResolver implementation.
+// Returns MutationResolver implementation
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
-// Query returns QueryResolver implementation.
+// Returns QueryResolver implementation
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
