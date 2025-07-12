@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -222,11 +223,12 @@ func TestTransferNoRowsError(t *testing.T) {
 	toAddress := "A"
 	amount := 100
 	_, err := mr.Transfer(ctx, fromAddress, toAddress, int32(amount))
+	// Check if transfer throws error
 	if err == nil {
 		t.Fatal("Transfer from nonexistent sender did not throw error")
 	}
 
-	// Check if error is NoRows error
+	// Check error type
 	if !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("Expected 'no rows' error, got: %v", err)
 	}
@@ -253,6 +255,32 @@ func TestTransferReducesBalanceToZero(t *testing.T) {
 	expectedA := 0
 	expectedB := 1000
 	assertBalances(t, db, expectedA, expectedB, "A", "B")
+}
+
+func TestTransferInsufficientBalanceError(t *testing.T) {
+	db := setupDB(t)
+
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	initWallet(t, db, "A", 1000)
+
+	// Transfer
+	fromAddress := "A"
+	toAddress := "B"
+	_, err := mr.Transfer(ctx, fromAddress, toAddress, int32(1100))
+	// Check if transfer throws error
+	if err == nil {
+		t.Fatal("Transfer with insufficient balance did not throw error")
+	}
+
+	// Check error type
+	if !strings.Contains(err.Error(), "insufficient balance") {
+		t.Fatalf("Expected 'insufficient balance' error, got: %v", err)
+	}
 
 }
 
