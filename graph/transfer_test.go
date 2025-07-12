@@ -285,6 +285,51 @@ func TestTransferAfterInsufficientBalance(t *testing.T) {
 
 }
 
+func TestCyclicTransfer(t *testing.T) {
+	db := setupDB(t)
+
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	initWallet(t, db, "A", 10)
+
+	// A -> B Transfer
+	amount := 10
+	fromAddress := "A"
+	toAddress := "B"
+	doTransfer(t, mr, ctx, fromAddress, toAddress, int32(amount))
+
+	// B -> C Transfer
+	fromAddress = "B"
+	toAddress = "C"
+	doTransfer(t, mr, ctx, fromAddress, toAddress, int32(amount))
+
+	// C -> A Transfer
+	fromAddress = "C"
+	toAddress = "A"
+	doTransfer(t, mr, ctx, fromAddress, toAddress, int32(amount))
+
+	// Check balances
+	a := getBalance(t, db, "A")
+	b := getBalance(t, db, "B")
+	c := getBalance(t, db, "C")
+
+	expectedA := 10
+	expectedB := 0
+	expectedC := 0
+
+	t.Logf("Final balances: %s = %d, %s = %d,  %s = %d", "A", a, "B", b, "C", c)
+
+	if a != expectedA || b != expectedB || c != expectedC {
+		t.Errorf("Unexpected balances: got %s = %d, %s = %d, %s = %d; want %s = %d, %s = %d, %s = %d",
+			"A", a, "B", b, "C", c, "A", expectedA, "B", expectedB, "C", expectedC)
+	}
+
+}
+
 func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	db := setupDB(t)
 
