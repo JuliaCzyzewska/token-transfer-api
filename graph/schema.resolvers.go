@@ -31,10 +31,7 @@ func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toA
 	// Add advisory lock for server and recipient
 	// If other transactions try to add lock, they will have to wait
 	// until the end of transaction
-	if err := r.addLockOnAddress(tx, fromAddress); err != nil {
-		return 0, err
-	}
-	if err := r.addLockOnAddress(tx, toAddress); err != nil {
+	if err := r.lockWallets(tx, fromAddress, toAddress); err != nil {
 		return 0, err
 	}
 
@@ -73,6 +70,31 @@ func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toA
 	return senderBalance - amount, nil
 }
 
+func (r *mutationResolver) lockWallets(tx *sql.Tx, fromAddress, toAddress string) error {
+	senderHash := hashAddress(fromAddress)
+	recipientHash := hashAddress(toAddress)
+
+	// locks hashes always in the same order, to avoid deadlock
+	if senderHash < recipientHash {
+		if err := r.lockHashAddress(tx, senderHash); err != nil {
+			return err
+		}
+		return r.lockHashAddress(tx, recipientHash)
+
+	} else {
+		if err := r.lockHashAddress(tx, recipientHash); err != nil {
+			return err
+		}
+		return r.lockHashAddress(tx, senderHash)
+	}
+
+}
+
+func (r *mutationResolver) lockHashAddress(tx *sql.Tx, hashAddressKey int64) error {
+	_, err := tx.Exec("SELECT pg_advisory_xact_lock($1)", hashAddressKey)
+	return err
+}
+
 // Add wallet with 0 tokens
 func (r *mutationResolver) addWallet(tx *sql.Tx, address string) error {
 	_, err := tx.Exec("INSERT INTO wallets (address, token_balance) VALUES ($1, 0)", address)
@@ -106,12 +128,6 @@ func (r *queryResolver) Wallet(ctx context.Context, address string) (*model.Wall
 	}
 
 	return &wallet, nil
-}
-
-func (r *mutationResolver) addLockOnAddress(tx *sql.Tx, address string) error {
-	hashKey := hashAddress(address)
-	_, err := tx.Exec("SELECT pg_advisory_xact_lock($1)", hashKey)
-	return err
 }
 
 // Return MutationResolver implementation
