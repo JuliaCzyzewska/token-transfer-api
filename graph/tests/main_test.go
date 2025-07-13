@@ -10,17 +10,12 @@ import (
 
 	"token_transfer/graph/tests/testutils"
 
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
 var testDB *sql.DB
 
 func TestMain(m *testing.M) {
-	// Load .env file
-	if err := godotenv.Load("../../.env"); err != nil {
-		log.Fatalf("Failed to load .env file: %v", err)
-	}
 
 	// Build DB connection string
 	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",

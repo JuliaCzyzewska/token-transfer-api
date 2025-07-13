@@ -19,12 +19,20 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Copy built binary and .env file from the builder stage
+
+# Install PostgreSQL client tools (pg_isready)
+RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
+
+# Copy wait script
+COPY wait-for-postgres.sh /usr/local/bin/wait-for-postgres.sh
+RUN chmod +x /usr/local/bin/wait-for-postgres.sh
+
+# Copy built binary file from the builder stage
 COPY --from=builder /app/server .
-COPY .env .env
 
 # Expose application port
 EXPOSE 8080
 
-# Start the server
-CMD ["./server"]
+
+# Start the server via wait script
+CMD ["wait-for-postgres.sh", "db", "./server"]
