@@ -5,65 +5,16 @@ import (
 	"database/sql"
 
 	"errors"
-	"fmt"
-	"log"
-	"os"
 	"strings"
 
 	"sync"
 	"testing"
 
-	"github.com/joho/godotenv"
+	"token_transfer/graph/testutils"
+
 	_ "github.com/lib/pq"
 	"github.com/shopspring/decimal"
 )
-
-var testDB *sql.DB
-
-func TestMain(m *testing.M) {
-	// Load .env file
-	if err := godotenv.Load("../.env"); err != nil {
-		log.Fatalf("Failed to load .env file: %v", err)
-	}
-
-	// Build DB connection string
-	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_NAME"),
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-	)
-
-	// Open DB connection
-	var err error
-	testDB, err = sql.Open("postgres", connStr)
-	if err != nil {
-		log.Fatalf("Failed to open DB: %v", err)
-	}
-
-	// Check if DB is reachable
-	if err := testDB.Ping(); err != nil {
-		log.Fatalf("Failed to ping DB: %v", err)
-	}
-
-	// Run the tests
-	code := m.Run()
-
-	// Close DB
-	if err := testDB.Close(); err != nil {
-		log.Printf("Failed to close DB: %v", err)
-	}
-
-	os.Exit(code)
-
-}
-
-// Returns already created DB instance
-func setupDB(t *testing.T) *sql.DB {
-	t.Helper()
-	return testDB
-}
 
 func initWallet(t *testing.T, db *sql.DB, address string, balance string) {
 	t.Helper()
@@ -127,7 +78,7 @@ func doTransfer(t *testing.T, mr *mutationResolver, ctx context.Context, fromAdd
 
 // Tests
 func TestTransferBetweenExistingWallets(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -169,7 +120,7 @@ func TestTransferBetweenExistingWallets(t *testing.T) {
 }
 
 func TestAddingNewWallet(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
@@ -193,7 +144,7 @@ func TestAddingNewWallet(t *testing.T) {
 }
 
 func TestFractionalTokenTransfer(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
@@ -216,7 +167,7 @@ func TestFractionalTokenTransfer(t *testing.T) {
 }
 
 func TestTransferNoRowsError(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -246,7 +197,7 @@ func TestTransferNoRowsError(t *testing.T) {
 }
 
 func TestTransferReducesBalanceToZero(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -274,7 +225,7 @@ func TestTransferReducesBalanceToZero(t *testing.T) {
 }
 
 func TestTransferInsufficientBalanceError(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -303,7 +254,7 @@ func TestTransferInsufficientBalanceError(t *testing.T) {
 }
 
 func TestTransferAfterInsufficientBalance(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -344,7 +295,7 @@ func TestTransferAfterInsufficientBalance(t *testing.T) {
 }
 
 func TestValidateTokenAmount_InvalidDecimal(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -372,7 +323,7 @@ func TestValidateTokenAmount_InvalidDecimal(t *testing.T) {
 }
 
 func TestValidateAmount_TooManyDecimalPlaces(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -401,7 +352,7 @@ func TestValidateAmount_TooManyDecimalPlaces(t *testing.T) {
 }
 
 func TestValidateAmount_TooManyDigits(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -430,7 +381,7 @@ func TestValidateAmount_TooManyDigits(t *testing.T) {
 }
 
 func TestValidateAmount_AmountBelowZero(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -459,7 +410,7 @@ func TestValidateAmount_AmountBelowZero(t *testing.T) {
 }
 
 func TestValidateAddressess_SameAddress(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -487,7 +438,7 @@ func TestValidateAddressess_SameAddress(t *testing.T) {
 }
 
 func TestValidateEthereumAddress(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -538,7 +489,7 @@ func TestValidateEthereumAddress(t *testing.T) {
 }
 
 func TestCyclicTransfer(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -580,7 +531,7 @@ func TestCyclicTransfer(t *testing.T) {
 }
 
 func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
@@ -665,7 +616,7 @@ func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 }
 
 func TestManyConcurrentTransfersDeadlock(t *testing.T) {
-	db := setupDB(t)
+	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
 	resolver := &Resolver{DB: db}
