@@ -77,7 +77,7 @@ transfer(from_address: ID!, to_address: ID!, amount: String!): String!
 
 ## Query example
 #### Query: 
-```json
+```graphql
 {
   wallet(address: "0x0000000000000000000000000000000000000000") {
     address
@@ -103,7 +103,7 @@ transfer(from_address: ID!, to_address: ID!, amount: String!): String!
 
 ### Standard transfer
 #### Mutation:
-```json
+```graphql
 mutation {
   transfer(
     from_address: "0x0000000000000000000000000000000000000000",
@@ -124,7 +124,7 @@ mutation {
 
 ### Smallest transfer available
 #### Mutation:
-```json
+```graphql
 mutation {
   transfer(
     from_address: "0xA000000000000000000000000000000000000000",
