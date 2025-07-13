@@ -1,0 +1,32 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16.1
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: WalletDB
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  app:
+    build: .
+    depends_on:
+      - db
+    environment:
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: WalletDB
+      DB_HOST: db
+      DB_PORT: 5432
+    ports:
+      - "8080:8080"
+    command: ["./server"]
+
+volumes:
+  pgdata:
