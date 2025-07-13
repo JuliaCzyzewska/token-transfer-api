@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"token_transfer/graph/testutils" // <- Upewnij się, że to Twój prawidłowy import
+	"token_transfer/graph/testutils"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
