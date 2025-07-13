@@ -133,34 +133,38 @@ func TestTransferBetweenExistingWallets(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+	bAddress := "0xB000000000000000000000000000000000000000"
+
 	// Clean and seed test data
 	clearWallets(t, db)
-	initWallet(t, db, "A", "1000")
-	initWallet(t, db, "B", "1000")
+
+	initWallet(t, db, aAddress, "1000")
+	initWallet(t, db, bAddress, "1000")
 
 	// A -> B Transfer
-	fromAddress := "A"
-	toAddress := "B"
+	fromAddress := aAddress
+	toAddress := bAddress
 	amount := "100"
 	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
 
 	// Check balances
 	expectedA := "900"
 	expectedB := "1100"
-	assertBalance(t, db, expectedA, "A")
-	assertBalance(t, db, expectedB, "B")
+	assertBalance(t, db, expectedA, aAddress)
+	assertBalance(t, db, expectedB, bAddress)
 
 	// B -> A Transfer
-	fromAddress = "B"
-	toAddress = "A"
+	fromAddress = bAddress
+	toAddress = aAddress
 	amount = "100"
 	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
 
 	// Check balances
 	expectedA = "1000"
 	expectedB = "1000"
-	assertBalance(t, db, expectedA, "A")
-	assertBalance(t, db, expectedB, "B")
+	assertBalance(t, db, expectedA, aAddress)
+	assertBalance(t, db, expectedB, bAddress)
 
 }
 
@@ -170,6 +174,8 @@ func TestAddingNewWallet(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+
 	// Clean data
 	clearWallets(t, db)
 	// Insert initial wallet
@@ -177,7 +183,7 @@ func TestAddingNewWallet(t *testing.T) {
 	initWallet(t, db, fromAddress, "1000000")
 
 	// Add new wallet through transfer of tokens from initial wallet
-	newWalletAddress := "A"
+	newWalletAddress := aAddress
 	amount := "100"
 	doTransfer(t, mr, ctx, fromAddress, newWalletAddress, amount)
 
@@ -198,7 +204,8 @@ func TestFractionalTokenTransfer(t *testing.T) {
 	fromAddress := "0x0000000000000000000000000000000000000000"
 	initWallet(t, db, fromAddress, "1000000")
 
-	toAddress := "A"
+	aAddress := "0xA000000000000000000000000000000000000000"
+	toAddress := aAddress
 	amount := "0.000000000000000001" // 1 * 10^-18
 	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
 
@@ -215,13 +222,16 @@ func TestTransferNoRowsError(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+	cAddress := "0xC000000000000000000000000000000000000000"
+
 	// Clean and seed test data
 	clearWallets(t, db)
-	initWallet(t, db, "A", "1000")
+	initWallet(t, db, aAddress, "1000")
 
 	// Try transfering tokens from nonexistent sender
-	fromAddress := "C"
-	toAddress := "A"
+	fromAddress := cAddress
+	toAddress := aAddress
 	amount := "100"
 	_, err := mr.Transfer(ctx, fromAddress, toAddress, amount)
 	// Check if transfer throws error
@@ -242,21 +252,24 @@ func TestTransferReducesBalanceToZero(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+	bAddress := "0xB000000000000000000000000000000000000000"
+
 	// Clean and seed test data
 	clearWallets(t, db)
 	amount := "1000"
-	initWallet(t, db, "A", amount)
+	initWallet(t, db, aAddress, amount)
 
 	// Transfer
-	fromAddress := "A"
-	toAddress := "B"
+	fromAddress := aAddress
+	toAddress := bAddress
 	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
 
 	// Check balances
 	expectedA := "0"
 	expectedB := "1000"
-	assertBalance(t, db, expectedA, "A")
-	assertBalance(t, db, expectedB, "B")
+	assertBalance(t, db, expectedA, aAddress)
+	assertBalance(t, db, expectedB, bAddress)
 
 }
 
@@ -267,13 +280,16 @@ func TestTransferInsufficientBalanceError(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+	bAddress := "0xB000000000000000000000000000000000000000"
+
 	// Clean and seed test data
 	clearWallets(t, db)
-	initWallet(t, db, "A", "1000")
+	initWallet(t, db, aAddress, "1000")
 
 	// Transfer
-	fromAddress := "A"
-	toAddress := "B"
+	fromAddress := aAddress
+	toAddress := bAddress
 	_, err := mr.Transfer(ctx, fromAddress, toAddress, "1100")
 	// Check if transfer throws error
 	if err == nil {
@@ -293,13 +309,16 @@ func TestTransferAfterInsufficientBalance(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+	bAddress := "0xB000000000000000000000000000000000000000"
+
 	// Clean and seed test data
 	clearWallets(t, db)
-	initWallet(t, db, "A", "10")
+	initWallet(t, db, aAddress, "10")
 
 	// Transfer amount bigger than sender's balance
-	fromAddress := "A"
-	toAddress := "B"
+	fromAddress := aAddress
+	toAddress := bAddress
 	amount := "11"
 
 	_, err := mr.Transfer(ctx, fromAddress, toAddress, amount)
@@ -319,8 +338,8 @@ func TestTransferAfterInsufficientBalance(t *testing.T) {
 	// Check balances
 	expectedA := "0"
 	expectedB := "10"
-	assertBalance(t, db, expectedA, "A")
-	assertBalance(t, db, expectedB, "B")
+	assertBalance(t, db, expectedA, aAddress)
+	assertBalance(t, db, expectedB, bAddress)
 
 }
 
@@ -331,13 +350,16 @@ func TestValidateTokenAmount_InvalidDecimal(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+	bAddress := "0xB000000000000000000000000000000000000000"
+
 	// Clean and seed test data
 	clearWallets(t, db)
-	initWallet(t, db, "A", "10")
+	initWallet(t, db, aAddress, "10")
 
 	// Transfer
 	invalidAmount := "abc123"
-	_, err := mr.Transfer(ctx, "A", "B", invalidAmount)
+	_, err := mr.Transfer(ctx, aAddress, bAddress, invalidAmount)
 
 	// Check if transfer throws error
 	if err == nil {
@@ -356,13 +378,16 @@ func TestValidateAmount_TooManyDecimalPlaces(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+	bAddress := "0xB000000000000000000000000000000000000000"
+
 	// Clean and seed test data
 	clearWallets(t, db)
 	initWallet(t, db, "A", "10")
 
 	// Transfer
 	invalidAmount := "1.1234567890123456789" // >18 decimal places
-	_, err := mr.Transfer(ctx, "A", "B", invalidAmount)
+	_, err := mr.Transfer(ctx, aAddress, bAddress, invalidAmount)
 
 	// Check if transfer throws error
 	if err == nil {
@@ -382,13 +407,16 @@ func TestValidateAmount_TooManyDigits(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+	bAddress := "0xB000000000000000000000000000000000000000"
+
 	// Clean and seed test data
 	clearWallets(t, db)
-	initWallet(t, db, "A", "10")
+	initWallet(t, db, aAddress, "10")
 
 	// Transfer
 	invalidAmount := "12345678901234567890123456789.0" // >28 digits
-	_, err := mr.Transfer(ctx, "A", "B", invalidAmount)
+	_, err := mr.Transfer(ctx, aAddress, bAddress, invalidAmount)
 
 	// Check if transfer throws error
 	if err == nil {
@@ -408,13 +436,16 @@ func TestValidateAmount_AmountBelowZero(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+	bAddress := "0xB000000000000000000000000000000000000000"
+
 	// Clean and seed test data
 	clearWallets(t, db)
-	initWallet(t, db, "A", "10")
+	initWallet(t, db, aAddress, "10")
 
 	// Transfer
 	invalidAmount := "-12"
-	_, err := mr.Transfer(ctx, "A", "B", invalidAmount)
+	_, err := mr.Transfer(ctx, aAddress, bAddress, invalidAmount)
 
 	// Check if transfer throws error
 	if err == nil {
@@ -427,6 +458,85 @@ func TestValidateAmount_AmountBelowZero(t *testing.T) {
 
 }
 
+func TestValidateAddressess_SameAddress(t *testing.T) {
+	db := setupDB(t)
+
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	aAddress := "0xA000000000000000000000000000000000000000"
+	smallAAddress := "0xa000000000000000000000000000000000000000" // lower and upper letters are treated the same
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	initWallet(t, db, aAddress, "10")
+
+	// Transfer
+	_, err := mr.Transfer(ctx, aAddress, smallAAddress, "1")
+
+	// Check if transfer throws error
+	if err == nil {
+		t.Fatal("Transfer with invalid amount did not throw error")
+	}
+	// Check error type
+	if !strings.Contains(err.Error(), "sender and recipient addresses must be different") {
+		t.Fatalf("Expected 'sender and recipient addresses must be different' error, got: %v", err)
+	}
+
+}
+
+func TestValidateEthereumAddress(t *testing.T) {
+	db := setupDB(t)
+
+	ctx := context.Background()
+	resolver := &Resolver{DB: db}
+	mr := &mutationResolver{resolver}
+
+	aAddress := "0xA000000000000000000000000000000000000000"
+
+	// Clean and seed test data
+	clearWallets(t, db)
+	initWallet(t, db, aAddress, "10")
+
+	// Address is too short
+	wrongAddress := "0xa00000000000000000000000000000000000000"
+	_, err := mr.Transfer(ctx, aAddress, wrongAddress, "1")
+	// Check if transfer throws error
+	if err == nil {
+		t.Fatal("Transfer with invalid amount did not throw error")
+	}
+	// Check error type
+	if !strings.Contains(err.Error(), "invalid Ethereum address format") {
+		t.Fatalf("Expected 'invalid Ethereum address format' error, got: %v", err)
+	}
+
+	// Address does not start with '0x'
+	wrongAddress = "00a000000000000000000000000000000000000000"
+	_, err = mr.Transfer(ctx, aAddress, wrongAddress, "1")
+	// Check if transfer throws error
+	if err == nil {
+		t.Fatal("Transfer with invalid amount did not throw error")
+	}
+	// Check error type
+	if !strings.Contains(err.Error(), "invalid Ethereum address format") {
+		t.Fatalf("Expected 'invalid Ethereum address format' error, got: %v", err)
+	}
+
+	// Address has letters other than A-F
+	wrongAddress = "0xG000000000000000000000000000000000000000"
+	_, err = mr.Transfer(ctx, aAddress, wrongAddress, "1")
+	// Check if transfer throws error
+	if err == nil {
+		t.Fatal("Transfer with invalid amount did not throw error")
+	}
+	// Check error type
+	if !strings.Contains(err.Error(), "invalid Ethereum address format") {
+		t.Fatalf("Expected 'invalid Ethereum address format' error, got: %v", err)
+	}
+
+}
+
 func TestCyclicTransfer(t *testing.T) {
 	db := setupDB(t)
 
@@ -434,24 +544,28 @@ func TestCyclicTransfer(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+	bAddress := "0xB000000000000000000000000000000000000000"
+	cAddress := "0xC000000000000000000000000000000000000000"
+
 	// Clean and seed test data
 	clearWallets(t, db)
-	initWallet(t, db, "A", "10")
+	initWallet(t, db, aAddress, "10")
 
 	// A -> B Transfer
 	amount := "10"
-	fromAddress := "A"
-	toAddress := "B"
+	fromAddress := aAddress
+	toAddress := bAddress
 	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
 
 	// B -> C Transfer
-	fromAddress = "B"
-	toAddress = "C"
+	fromAddress = bAddress
+	toAddress = cAddress
 	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
 
 	// C -> A Transfer
-	fromAddress = "C"
-	toAddress = "A"
+	fromAddress = cAddress
+	toAddress = aAddress
 	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
 
 	// Check balances
@@ -459,9 +573,9 @@ func TestCyclicTransfer(t *testing.T) {
 	expectedB := "0"
 	expectedC := "0"
 
-	assertBalance(t, db, expectedA, "A")
-	assertBalance(t, db, expectedB, "B")
-	assertBalance(t, db, expectedC, "C")
+	assertBalance(t, db, expectedA, aAddress)
+	assertBalance(t, db, expectedB, bAddress)
+	assertBalance(t, db, expectedC, cAddress)
 
 }
 
@@ -472,10 +586,15 @@ func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+	bAddress := "0xB000000000000000000000000000000000000000"
+	cAddress := "0xC000000000000000000000000000000000000000"
+	dAddress := "0xD000000000000000000000000000000000000000"
+
 	// Clean and seed test data
 	clearWallets(t, db)
-	initWallet(t, db, "A", "10")
-	initWallet(t, db, "D", "10")
+	initWallet(t, db, aAddress, "10")
+	initWallet(t, db, dAddress, "10")
 
 	// wait for 3 wg.Done() before continuing
 	var wg sync.WaitGroup
@@ -490,7 +609,7 @@ func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start // barrier up
-		_, err := mr.Transfer(ctx, "A", "B", "4")
+		_, err := mr.Transfer(ctx, aAddress, bAddress, "4")
 		if err != nil && !strings.Contains(err.Error(), "insufficient balance") {
 			t.Errorf("A -> B failed unexpectedly: %v", err)
 		}
@@ -501,7 +620,7 @@ func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start // barrier up
-		_, err := mr.Transfer(ctx, "A", "C", "7")
+		_, err := mr.Transfer(ctx, aAddress, cAddress, "7")
 		if err != nil && !strings.Contains(err.Error(), "insufficient balance") {
 			t.Errorf("A -> C failed unexpectedly: %v", err)
 		}
@@ -511,7 +630,7 @@ func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start // barrier up
-		_, err := mr.Transfer(ctx, "D", "A", "1")
+		_, err := mr.Transfer(ctx, dAddress, aAddress, "1")
 		if err != nil {
 			t.Errorf("D -> A failed unexpectedly: %v", err)
 		}
@@ -523,16 +642,16 @@ func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	wg.Wait()
 
 	// Check final balances
-	aBalance := getBalance(t, db, "A")
-	bBalance := getBalance(t, db, "B")
-	cBalance := getBalance(t, db, "C")
+	aBalance := getBalance(t, db, aAddress)
+	bBalance := getBalance(t, db, bAddress)
+	cBalance := getBalance(t, db, cAddress)
 
 	t.Logf("Final balances: A = %s, B = %s, C = %s", aBalance, bBalance, cBalance)
 
 	// Convert balance string into decimal
 	aDec, err := decimal.NewFromString(aBalance)
 	if err != nil {
-		t.Fatalf("Invalid decimal in DB balance for %s: %v", "A", err)
+		t.Fatalf("Invalid decimal in DB balance for %s: %v", aAddress, err)
 	}
 
 	// Expected:
@@ -552,10 +671,13 @@ func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 	resolver := &Resolver{DB: db}
 	mr := &mutationResolver{resolver}
 
+	aAddress := "0xA000000000000000000000000000000000000000"
+	bAddress := "0xB000000000000000000000000000000000000000"
+
 	// Clean and seed test data
 	clearWallets(t, db)
-	initWallet(t, db, "A", "1000")
-	initWallet(t, db, "B", "1000")
+	initWallet(t, db, aAddress, "1000")
+	initWallet(t, db, bAddress, "1000")
 
 	// wait for 50 wg.Done() before continuing
 	const transferCount = 50
@@ -571,13 +693,13 @@ func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 	// 25 transfers B -> A (amount 10)
 	for i := 0; i < transferCount; i++ {
 		// A -> B
-		fromAddress := "A"
-		toAddress := "B"
+		fromAddress := aAddress
+		toAddress := bAddress
 		amount := "5"
 
 		//  B -> A
 		if i%2 == 1 {
-			fromAddress, toAddress = "B", "A"
+			fromAddress, toAddress = bAddress, aAddress
 			amount = "10"
 		}
 
@@ -603,6 +725,6 @@ func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 	expectedA := "1125"
 	expectedB := "875"
 
-	assertBalance(t, db, expectedA, "A")
-	assertBalance(t, db, expectedB, "B")
+	assertBalance(t, db, expectedA, aAddress)
+	assertBalance(t, db, expectedB, bAddress)
 }

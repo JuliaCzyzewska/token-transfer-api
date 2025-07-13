@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math/big"
+	"regexp"
+	"strings"
 	"token_transfer/graph/model"
 
 	"github.com/shopspring/decimal"
@@ -91,6 +93,22 @@ func validateTokenAmount(amount string) error {
 	return nil
 }
 
+func validateDifferentAddresses(from, to string) error {
+	if strings.EqualFold(from, to) {
+		return fmt.Errorf("sender and recipient addresses must be different")
+	}
+	return nil
+}
+
+func validateEthereumAddress(address string) error {
+	var ethAddressRegex = regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
+
+	if !ethAddressRegex.MatchString(address) {
+		return fmt.Errorf("invalid Ethereum address format")
+	}
+	return nil
+}
+
 // Resolver for the transfer field
 func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toAddress string, amount string) (string, error) {
 	tx, err := r.DB.Begin()
@@ -98,6 +116,19 @@ func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toA
 		return "", err
 	}
 	defer tx.Rollback()
+
+	// Validate addressess
+	if err := validateDifferentAddresses(fromAddress, toAddress); err != nil {
+		return "", err
+	}
+
+	if err := validateEthereumAddress(fromAddress); err != nil {
+		return "", fmt.Errorf("fromAddress invalid: %w", err)
+	}
+
+	if err := validateEthereumAddress(toAddress); err != nil {
+		return "", fmt.Errorf("toAddress invalid: %w", err)
+	}
 
 	// Validate amount
 	if err := validateTokenAmount(amount); err != nil {
