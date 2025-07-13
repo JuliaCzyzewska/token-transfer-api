@@ -27,6 +27,18 @@ services:
     ports:
       - "8080:8080"
 
+  test:
+    build:
+      context: .
+      target: tester
+    depends_on:
+      - db
+    environment:
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: WalletDB
+      DB_HOST: db
+      DB_PORT: 5432
 
 volumes:
   pgdata:
