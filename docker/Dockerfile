@@ -26,7 +26,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy wait script
-COPY wait-for-postgres.sh /usr/local/bin/wait-for-postgres.sh
+COPY scripts/wait-for-postgres.sh /usr/local/bin/wait-for-postgres.sh
 RUN chmod +x /usr/local/bin/wait-for-postgres.sh
 
 # Copy source
@@ -46,7 +46,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
 
 # Copy wait script
-COPY wait-for-postgres.sh /usr/local/bin/wait-for-postgres.sh
+COPY scripts/wait-for-postgres.sh /usr/local/bin/wait-for-postgres.sh
 RUN chmod +x /usr/local/bin/wait-for-postgres.sh
 
 # Copy built binary file from the builder stage

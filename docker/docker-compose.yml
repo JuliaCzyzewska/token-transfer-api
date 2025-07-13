@@ -12,10 +12,14 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../db/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   app:
-    build: .
+    build:
+      context: ..   
+      dockerfile: docker/Dockerfile 
+    volumes:
+      - ../scripts/wait-for-postgres.sh:/usr/local/bin/wait-for-postgres.sh    
     depends_on:
       - db
     environment:
@@ -29,8 +33,11 @@ services:
 
   test:
     build:
-      context: .
+      context: ..
+      dockerfile: docker/Dockerfile
       target: tester
+    volumes:
+      - ../scripts/wait-for-postgres.sh:/usr/local/bin/wait-for-postgres.sh    
     depends_on:
       - db
     environment:
