@@ -4,5 +4,6 @@ import "database/sql"
 
 // Dependency injection for the app.
 type Resolver struct {
-	DB *sql.DB
+	DB          *sql.DB
+	WalletTable string // name of DB table
 }

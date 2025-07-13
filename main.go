@@ -52,7 +52,11 @@ func main() {
 	fmt.Println("Connected to DB.")
 
 	// Start Graph server
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "wallets",
+	}
+
 	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: resolver}))
 
 	srv.AddTransport(transport.Options{})

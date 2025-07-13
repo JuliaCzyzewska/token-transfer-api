@@ -49,24 +49,33 @@ func (r *mutationResolver) lockHashAddress(tx *sql.Tx, hashAddressKey int64) err
 
 // Add wallet with 0 tokens
 func (r *mutationResolver) addWallet(tx *sql.Tx, address string) error {
-	_, err := tx.Exec("INSERT INTO wallets (address, token_balance) VALUES ($1, 0)", address)
+	query := fmt.Sprintf("INSERT INTO %s (address, token_balance) VALUES ($1, 0)", r.WalletTable)
+	_, err := tx.Exec(query, address)
+
 	return err
 }
 
 // Return token_balance as string
 func (r *mutationResolver) getTokenBalance(tx *sql.Tx, address string) (string, error) {
 	var balance string
-	err := tx.QueryRow("SELECT token_balance FROM wallets WHERE address = $1", address).Scan(&balance)
+	query := fmt.Sprintf("SELECT token_balance FROM %s WHERE address = $1", r.WalletTable)
+	err := tx.QueryRow(query, address).Scan(&balance)
+
 	return balance, err
 }
 
 // Update balances; explicit cast amount from string to numeric
 func (r *mutationResolver) updateBalances(tx *sql.Tx, fromAddress, toAddress string, amount string) error {
-	_, err := tx.Exec(`UPDATE wallets SET token_balance = token_balance - $1::numeric WHERE address = $2`, amount, fromAddress)
+
+	query := fmt.Sprintf(`UPDATE %s SET token_balance = token_balance - $1::numeric WHERE address = $2`, r.WalletTable)
+	_, err := tx.Exec(query, amount, fromAddress)
+
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(`UPDATE wallets SET token_balance = token_balance + $1::numeric WHERE address = $2`, amount, toAddress)
+	query = fmt.Sprintf(`UPDATE %s SET token_balance = token_balance + $1::numeric WHERE address = $2`, r.WalletTable)
+	_, err = tx.Exec(query, amount, toAddress)
+
 	return err
 }
 
@@ -194,7 +203,8 @@ func (r *mutationResolver) Transfer(ctx context.Context, fromAddress string, toA
 
 // Resolver for the wallet field
 func (r *queryResolver) Wallet(ctx context.Context, address string) (*model.Wallet, error) {
-	row := r.DB.QueryRow("SELECT address, token_balance FROM wallets WHERE address = $1", address)
+	query := fmt.Sprintf("SELECT address, token_balance FROM %s WHERE address = $1", r.WalletTable)
+	row := r.DB.QueryRow(query, address)
 
 	var wallet model.Wallet
 	err := row.Scan(&wallet.Address, &wallet.Balance)
