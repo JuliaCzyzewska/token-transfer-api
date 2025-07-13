@@ -19,8 +19,10 @@ To run the application, ensure you have the following installed:
 
 ## How to run the app
 ### Build the Docker images:
+Navigate to the root directory of the project, then run the following commands:
 
 ```bash
+cd docker
 docker-compose build 
 ```
 
