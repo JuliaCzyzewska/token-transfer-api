@@ -1,88 +1,27 @@
-package graph
+package graph_test
 
 import (
 	"context"
 	"database/sql"
-
 	"errors"
 	"strings"
-
 	"sync"
 	"testing"
 
-	"token_transfer/graph/testutils"
+	"token_transfer/graph"
+	"token_transfer/graph/tests/testutils"
 
 	_ "github.com/lib/pq"
 	"github.com/shopspring/decimal"
 )
-
-func initWallet(t *testing.T, db *sql.DB, address string, balance string) {
-	t.Helper()
-	_, err := db.Exec("INSERT INTO wallets (address, token_balance) VALUES ($1, $2::numeric)", address, balance)
-	if err != nil {
-		t.Fatalf("Failed to insert wallet %s: %v", address, err)
-	}
-}
-
-func clearWallets(t *testing.T, db *sql.DB) {
-	t.Helper()
-	_, err := db.Exec("DELETE FROM wallets")
-	if err != nil {
-		t.Fatalf("Failed to clear wallets: %v", err)
-	}
-}
-
-func getBalance(t *testing.T, db *sql.DB, address string) string {
-	t.Helper()
-	var balance string
-	err := db.QueryRow("SELECT token_balance FROM wallets WHERE address = $1", address).Scan(&balance)
-	if err != nil {
-		t.Fatalf("Failed to get balance for %s: %v", address, err)
-	}
-	return balance
-}
-
-func assertBalance(t *testing.T, db *sql.DB, expectedA, addrA string) {
-	t.Helper()
-	aStr := getBalance(t, db, addrA)
-
-	// Convert balance strings into decimals
-	aDec, err := decimal.NewFromString(aStr)
-	if err != nil {
-		t.Fatalf("Invalid decimal in DB balance for %s: %v", addrA, err)
-	}
-
-	expectedADec, err := decimal.NewFromString(expectedA)
-	if err != nil {
-		t.Fatalf("Invalid decimal in expected balance for %s: %v", addrA, err)
-	}
-
-	// Check balance
-	t.Logf("Final balance: %s = %s", addrA, aDec.String())
-
-	if !aDec.Equal(expectedADec) {
-		t.Errorf("Unexpected balance: got %s = %s; want %s = %s",
-			addrA, aDec.String(), addrA, expectedADec.String())
-	}
-
-}
-
-func doTransfer(t *testing.T, mr *mutationResolver, ctx context.Context, fromAddress, toAddress, amount string) {
-	t.Helper()
-
-	_, err := mr.Transfer(ctx, fromAddress, toAddress, amount)
-	if err != nil {
-		t.Errorf("Transfer %s → %s failed: %v", fromAddress, toAddress, err)
-	}
-}
 
 // Tests
 func TestTransferBetweenExistingWallets(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	bAddress := "0xB000000000000000000000000000000000000000"
@@ -97,7 +36,7 @@ func TestTransferBetweenExistingWallets(t *testing.T) {
 	fromAddress := aAddress
 	toAddress := bAddress
 	amount := "100"
-	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
+	doTransfer(t, mutation, ctx, fromAddress, toAddress, amount)
 
 	// Check balances
 	expectedA := "900"
@@ -109,7 +48,7 @@ func TestTransferBetweenExistingWallets(t *testing.T) {
 	fromAddress = bAddress
 	toAddress = aAddress
 	amount = "100"
-	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
+	doTransfer(t, mutation, ctx, fromAddress, toAddress, amount)
 
 	// Check balances
 	expectedA = "1000"
@@ -122,8 +61,8 @@ func TestTransferBetweenExistingWallets(t *testing.T) {
 func TestAddingNewWallet(t *testing.T) {
 	db := testutils.SetupDB(t)
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 
@@ -136,7 +75,7 @@ func TestAddingNewWallet(t *testing.T) {
 	// Add new wallet through transfer of tokens from initial wallet
 	newWalletAddress := aAddress
 	amount := "100"
-	doTransfer(t, mr, ctx, fromAddress, newWalletAddress, amount)
+	doTransfer(t, mutation, ctx, fromAddress, newWalletAddress, amount)
 
 	// Check if new wallet exists
 	assertBalance(t, db, amount, newWalletAddress)
@@ -146,8 +85,8 @@ func TestAddingNewWallet(t *testing.T) {
 func TestFractionalTokenTransfer(t *testing.T) {
 	db := testutils.SetupDB(t)
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	// Clean data
 	clearWallets(t, db)
@@ -158,7 +97,7 @@ func TestFractionalTokenTransfer(t *testing.T) {
 	aAddress := "0xA000000000000000000000000000000000000000"
 	toAddress := aAddress
 	amount := "0.000000000000000001" // 1 * 10^-18
-	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
+	doTransfer(t, mutation, ctx, fromAddress, toAddress, amount)
 
 	// Check balances
 	expectedSenderBalance := "999999.999999999999999999"
@@ -170,8 +109,8 @@ func TestTransferNoRowsError(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	cAddress := "0xC000000000000000000000000000000000000000"
@@ -184,7 +123,7 @@ func TestTransferNoRowsError(t *testing.T) {
 	fromAddress := cAddress
 	toAddress := aAddress
 	amount := "100"
-	_, err := mr.Transfer(ctx, fromAddress, toAddress, amount)
+	_, err := mutation.Transfer(ctx, fromAddress, toAddress, amount)
 	// Check if transfer throws error
 	if err == nil {
 		t.Fatal("Transfer from nonexistent sender did not throw error")
@@ -200,8 +139,8 @@ func TestTransferReducesBalanceToZero(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	bAddress := "0xB000000000000000000000000000000000000000"
@@ -214,7 +153,7 @@ func TestTransferReducesBalanceToZero(t *testing.T) {
 	// Transfer
 	fromAddress := aAddress
 	toAddress := bAddress
-	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
+	doTransfer(t, mutation, ctx, fromAddress, toAddress, amount)
 
 	// Check balances
 	expectedA := "0"
@@ -228,8 +167,8 @@ func TestTransferInsufficientBalanceError(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	bAddress := "0xB000000000000000000000000000000000000000"
@@ -241,7 +180,7 @@ func TestTransferInsufficientBalanceError(t *testing.T) {
 	// Transfer
 	fromAddress := aAddress
 	toAddress := bAddress
-	_, err := mr.Transfer(ctx, fromAddress, toAddress, "1100")
+	_, err := mutation.Transfer(ctx, fromAddress, toAddress, "1100")
 	// Check if transfer throws error
 	if err == nil {
 		t.Fatal("Transfer with insufficient balance did not throw error")
@@ -257,8 +196,8 @@ func TestTransferAfterInsufficientBalance(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	bAddress := "0xB000000000000000000000000000000000000000"
@@ -272,7 +211,7 @@ func TestTransferAfterInsufficientBalance(t *testing.T) {
 	toAddress := bAddress
 	amount := "11"
 
-	_, err := mr.Transfer(ctx, fromAddress, toAddress, amount)
+	_, err := mutation.Transfer(ctx, fromAddress, toAddress, amount)
 	// Check if transfer throws error
 	if err == nil {
 		t.Fatal("Transfer with insufficient balance did not throw error")
@@ -284,7 +223,7 @@ func TestTransferAfterInsufficientBalance(t *testing.T) {
 
 	// Transfer amount sender can send
 	amount = "10"
-	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
+	doTransfer(t, mutation, ctx, fromAddress, toAddress, amount)
 
 	// Check balances
 	expectedA := "0"
@@ -298,8 +237,8 @@ func TestValidateTokenAmount_InvalidDecimal(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	bAddress := "0xB000000000000000000000000000000000000000"
@@ -310,7 +249,7 @@ func TestValidateTokenAmount_InvalidDecimal(t *testing.T) {
 
 	// Transfer
 	invalidAmount := "abc123"
-	_, err := mr.Transfer(ctx, aAddress, bAddress, invalidAmount)
+	_, err := mutation.Transfer(ctx, aAddress, bAddress, invalidAmount)
 
 	// Check if transfer throws error
 	if err == nil {
@@ -326,8 +265,8 @@ func TestValidateAmount_TooManyDecimalPlaces(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	bAddress := "0xB000000000000000000000000000000000000000"
@@ -338,7 +277,7 @@ func TestValidateAmount_TooManyDecimalPlaces(t *testing.T) {
 
 	// Transfer
 	invalidAmount := "1.1234567890123456789" // >18 decimal places
-	_, err := mr.Transfer(ctx, aAddress, bAddress, invalidAmount)
+	_, err := mutation.Transfer(ctx, aAddress, bAddress, invalidAmount)
 
 	// Check if transfer throws error
 	if err == nil {
@@ -355,8 +294,8 @@ func TestValidateAmount_TooManyDigits(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	bAddress := "0xB000000000000000000000000000000000000000"
@@ -367,7 +306,7 @@ func TestValidateAmount_TooManyDigits(t *testing.T) {
 
 	// Transfer
 	invalidAmount := "12345678901234567890123456789.0" // >28 digits
-	_, err := mr.Transfer(ctx, aAddress, bAddress, invalidAmount)
+	_, err := mutation.Transfer(ctx, aAddress, bAddress, invalidAmount)
 
 	// Check if transfer throws error
 	if err == nil {
@@ -384,8 +323,8 @@ func TestValidateAmount_AmountBelowZero(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	bAddress := "0xB000000000000000000000000000000000000000"
@@ -396,7 +335,7 @@ func TestValidateAmount_AmountBelowZero(t *testing.T) {
 
 	// Transfer
 	invalidAmount := "-12"
-	_, err := mr.Transfer(ctx, aAddress, bAddress, invalidAmount)
+	_, err := mutation.Transfer(ctx, aAddress, bAddress, invalidAmount)
 
 	// Check if transfer throws error
 	if err == nil {
@@ -413,8 +352,8 @@ func TestValidateAddressess_SameAddress(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	smallAAddress := "0xa000000000000000000000000000000000000000" // lower and upper letters are treated the same
@@ -424,7 +363,7 @@ func TestValidateAddressess_SameAddress(t *testing.T) {
 	initWallet(t, db, aAddress, "10")
 
 	// Transfer
-	_, err := mr.Transfer(ctx, aAddress, smallAAddress, "1")
+	_, err := mutation.Transfer(ctx, aAddress, smallAAddress, "1")
 
 	// Check if transfer throws error
 	if err == nil {
@@ -441,8 +380,8 @@ func TestValidateEthereumAddress(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 
@@ -452,7 +391,7 @@ func TestValidateEthereumAddress(t *testing.T) {
 
 	// Address is too short
 	wrongAddress := "0xa00000000000000000000000000000000000000"
-	_, err := mr.Transfer(ctx, aAddress, wrongAddress, "1")
+	_, err := mutation.Transfer(ctx, aAddress, wrongAddress, "1")
 	// Check if transfer throws error
 	if err == nil {
 		t.Fatal("Transfer with invalid amount did not throw error")
@@ -464,7 +403,7 @@ func TestValidateEthereumAddress(t *testing.T) {
 
 	// Address does not start with '0x'
 	wrongAddress = "00a000000000000000000000000000000000000000"
-	_, err = mr.Transfer(ctx, aAddress, wrongAddress, "1")
+	_, err = mutation.Transfer(ctx, aAddress, wrongAddress, "1")
 	// Check if transfer throws error
 	if err == nil {
 		t.Fatal("Transfer with invalid amount did not throw error")
@@ -476,7 +415,7 @@ func TestValidateEthereumAddress(t *testing.T) {
 
 	// Address has letters other than A-F
 	wrongAddress = "0xG000000000000000000000000000000000000000"
-	_, err = mr.Transfer(ctx, aAddress, wrongAddress, "1")
+	_, err = mutation.Transfer(ctx, aAddress, wrongAddress, "1")
 	// Check if transfer throws error
 	if err == nil {
 		t.Fatal("Transfer with invalid amount did not throw error")
@@ -492,8 +431,8 @@ func TestCyclicTransfer(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	bAddress := "0xB000000000000000000000000000000000000000"
@@ -507,17 +446,17 @@ func TestCyclicTransfer(t *testing.T) {
 	amount := "10"
 	fromAddress := aAddress
 	toAddress := bAddress
-	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
+	doTransfer(t, mutation, ctx, fromAddress, toAddress, amount)
 
 	// B -> C Transfer
 	fromAddress = bAddress
 	toAddress = cAddress
-	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
+	doTransfer(t, mutation, ctx, fromAddress, toAddress, amount)
 
 	// C -> A Transfer
 	fromAddress = cAddress
 	toAddress = aAddress
-	doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
+	doTransfer(t, mutation, ctx, fromAddress, toAddress, amount)
 
 	// Check balances
 	expectedA := "10"
@@ -534,8 +473,8 @@ func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	bAddress := "0xB000000000000000000000000000000000000000"
@@ -560,7 +499,7 @@ func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start // barrier up
-		_, err := mr.Transfer(ctx, aAddress, bAddress, "4")
+		_, err := mutation.Transfer(ctx, aAddress, bAddress, "4")
 		if err != nil && !strings.Contains(err.Error(), "insufficient balance") {
 			t.Errorf("A -> B failed unexpectedly: %v", err)
 		}
@@ -571,7 +510,7 @@ func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start // barrier up
-		_, err := mr.Transfer(ctx, aAddress, cAddress, "7")
+		_, err := mutation.Transfer(ctx, aAddress, cAddress, "7")
 		if err != nil && !strings.Contains(err.Error(), "insufficient balance") {
 			t.Errorf("A -> C failed unexpectedly: %v", err)
 		}
@@ -581,7 +520,7 @@ func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start // barrier up
-		_, err := mr.Transfer(ctx, dAddress, aAddress, "1")
+		_, err := mutation.Transfer(ctx, dAddress, aAddress, "1")
 		if err != nil {
 			t.Errorf("D -> A failed unexpectedly: %v", err)
 		}
@@ -619,8 +558,8 @@ func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &Resolver{DB: db}
-	mr := &mutationResolver{resolver}
+	resolver := &graph.Resolver{DB: db}
+	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
 	bAddress := "0xB000000000000000000000000000000000000000"
@@ -659,7 +598,7 @@ func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 			defer wg.Done()
 			<-start // barrier up
 
-			doTransfer(t, mr, ctx, fromAddress, toAddress, amount)
+			doTransfer(t, mutation, ctx, fromAddress, toAddress, amount)
 		}(fromAddress, toAddress, amount)
 	}
 

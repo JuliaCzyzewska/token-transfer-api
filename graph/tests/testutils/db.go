@@ -2,7 +2,6 @@ package testutils
 
 import (
 	"database/sql"
-
 	"testing"
 
 	_ "github.com/lib/pq"

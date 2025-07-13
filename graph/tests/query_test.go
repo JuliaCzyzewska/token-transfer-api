@@ -5,48 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
+
 	"token_transfer/graph"
-	"token_transfer/graph/testutils"
-
-	"github.com/shopspring/decimal"
+	"token_transfer/graph/tests/testutils"
 )
-
-func initWallet(t *testing.T, db *sql.DB, address string, balance string) {
-	t.Helper()
-	_, err := db.Exec("INSERT INTO wallets (address, token_balance) VALUES ($1, $2::numeric)", address, balance)
-	if err != nil {
-		t.Fatalf("Failed to insert wallet %s: %v", address, err)
-	}
-}
-
-func clearWallets(t *testing.T, db *sql.DB) {
-	t.Helper()
-	_, err := db.Exec("DELETE FROM wallets")
-	if err != nil {
-		t.Fatalf("Failed to clear wallets: %v", err)
-	}
-}
-
-func assertBalance(t *testing.T, expectedA, actualA string) {
-	t.Helper()
-
-	// Convert balance strings into decimals
-	aDec, err := decimal.NewFromString(actualA)
-	if err != nil {
-		t.Fatalf("Invalid decimal in DB balance.")
-	}
-
-	expectedADec, err := decimal.NewFromString(expectedA)
-	if err != nil {
-		t.Fatalf("Invalid decimal in expected balance.")
-	}
-
-	if !aDec.Equal(expectedADec) {
-		t.Errorf("Unexpected balance: got %s; want %s",
-			aDec.String(), expectedADec.String())
-	}
-
-}
 
 func TestWalletResolver(t *testing.T) {
 	db := testutils.SetupDB(t)
@@ -73,7 +35,7 @@ func TestWalletResolver(t *testing.T) {
 		t.Errorf("Expected address %s, got %s", aAddress, wallet.Address)
 	}
 
-	assertBalance(t, aBalance, wallet.Balance)
+	assertBalance(t, db, wallet.Balance, aAddress)
 }
 
 func TestWalletResolver_NoWallet(t *testing.T) {
