@@ -48,6 +48,11 @@ func TestMain(m *testing.M) {
 
 	code := m.Run()
 
+	// Clean and reset database state
+	if err := testutils.ResetDatabaseState(testDB); err != nil {
+		log.Fatalf("Failed to reset DB: %v", err)
+	}
+
 	_ = testDB.Close()
 	os.Exit(code)
 }
