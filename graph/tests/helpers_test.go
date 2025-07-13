@@ -12,7 +12,7 @@ import (
 
 func initWallet(t *testing.T, db *sql.DB, address string, balance string) {
 	t.Helper()
-	_, err := db.Exec("INSERT INTO wallets (address, token_balance) VALUES ($1, $2::numeric)", address, balance)
+	_, err := db.Exec("INSERT INTO test_wallets (address, token_balance) VALUES ($1, $2::numeric)", address, balance)
 	if err != nil {
 		t.Fatalf("Failed to insert wallet %s: %v", address, err)
 	}
@@ -20,7 +20,7 @@ func initWallet(t *testing.T, db *sql.DB, address string, balance string) {
 
 func clearWallets(t *testing.T, db *sql.DB) {
 	t.Helper()
-	_, err := db.Exec("DELETE FROM wallets")
+	_, err := db.Exec("DELETE FROM test_wallets")
 	if err != nil {
 		t.Fatalf("Failed to clear wallets: %v", err)
 	}
@@ -29,7 +29,7 @@ func clearWallets(t *testing.T, db *sql.DB) {
 func getBalance(t *testing.T, db *sql.DB, address string) string {
 	t.Helper()
 	var balance string
-	err := db.QueryRow("SELECT token_balance FROM wallets WHERE address = $1", address).Scan(&balance)
+	err := db.QueryRow("SELECT token_balance FROM test_wallets WHERE address = $1", address).Scan(&balance)
 	if err != nil {
 		t.Fatalf("Failed to get balance for %s: %v", address, err)
 	}

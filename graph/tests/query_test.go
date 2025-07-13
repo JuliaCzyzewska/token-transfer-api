@@ -13,7 +13,11 @@ import (
 func TestWalletResolver(t *testing.T) {
 	db := testutils.SetupDB(t)
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	qr := resolver.Query()
 
 	// Clean and seed test data
@@ -41,7 +45,11 @@ func TestWalletResolver(t *testing.T) {
 func TestWalletResolver_NoWallet(t *testing.T) {
 	db := testutils.SetupDB(t)
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	qr := resolver.Query()
 
 	// Clean test data

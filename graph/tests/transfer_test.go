@@ -20,7 +20,11 @@ func TestTransferBetweenExistingWallets(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -61,7 +65,11 @@ func TestTransferBetweenExistingWallets(t *testing.T) {
 func TestAddingNewWallet(t *testing.T) {
 	db := testutils.SetupDB(t)
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -85,7 +93,11 @@ func TestAddingNewWallet(t *testing.T) {
 func TestFractionalTokenTransfer(t *testing.T) {
 	db := testutils.SetupDB(t)
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	// Clean data
@@ -109,7 +121,11 @@ func TestTransferNoRowsError(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -139,7 +155,11 @@ func TestTransferReducesBalanceToZero(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -167,7 +187,11 @@ func TestTransferInsufficientBalanceError(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -196,7 +220,11 @@ func TestTransferAfterInsufficientBalance(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -237,7 +265,11 @@ func TestValidateTokenAmount_InvalidDecimal(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -265,7 +297,11 @@ func TestValidateAmount_TooManyDecimalPlaces(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -294,7 +330,11 @@ func TestValidateAmount_TooManyDigits(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -323,7 +363,11 @@ func TestValidateAmount_AmountBelowZero(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -352,7 +396,11 @@ func TestValidateAddressess_SameAddress(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -380,7 +428,11 @@ func TestValidateEthereumAddress(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -431,7 +483,11 @@ func TestCyclicTransfer(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -473,7 +529,11 @@ func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
@@ -558,7 +618,11 @@ func TestManyConcurrentTransfersDeadlock(t *testing.T) {
 	db := testutils.SetupDB(t)
 
 	ctx := context.Background()
-	resolver := &graph.Resolver{DB: db}
+	resolver := &graph.Resolver{
+		DB:          db,
+		WalletTable: "test_wallets",
+	}
+
 	mutation := resolver.Mutation()
 
 	aAddress := "0xA000000000000000000000000000000000000000"
