@@ -591,12 +591,8 @@ func TestRaceConditionSameWalletConcurrentTransfers(t *testing.T) {
 	// Wait for all to finish
 	wg.Wait()
 
-	// Check final balances
+	// Check final A balance
 	aBalance := getBalance(t, db, aAddress)
-	bBalance := getBalance(t, db, bAddress)
-	cBalance := getBalance(t, db, cAddress)
-
-	t.Logf("Final balances: A = %s, B = %s, C = %s", aBalance, bBalance, cBalance)
 
 	// Convert balance string into decimal
 	aDec, err := decimal.NewFromString(aBalance)
